@@ -1,12 +1,12 @@
 # SmartHealth — Intelligent Healthcare & Disease Prediction Platform
 
-SmartHealth is a production-ready, full-stack healthcare platform featuring automated disease prediction (Diabetes, Heart Disease, Chest X-ray analysis), medical report OCR parsing, patient records management, doctor consultations, and an AI-powered medical assistant powered by Google Gemini.
+SmartHealth is a full-stack healthcare platform featuring automated disease prediction (Diabetes, Heart Disease, Chest X-ray analysis), medical report OCR parsing, patient records management, doctor consultations, and an AI-powered medical assistant powered by Google Gemini.
 
 ---
 
 ## 🏛️ System Architecture
 
-### Application Architecture
+Docker is used **ONLY** for running the PostgreSQL 16 database. The FastAPI backend and React (Vite) frontend run directly on the host machine.
 
 ```
                                   +-------------------------------------------------------+
@@ -16,23 +16,16 @@ SmartHealth is a production-ready, full-stack healthcare platform featuring auto
                                                               |
                                                               v
                                   +-------------------------------------------------------+
-                                  |                     Web Browser                       |
-                                  |              (React 18 + Vite Frontend SPA)           |
+                                  |               React Frontend (Vite SPA)               |
+                                  |                 http://localhost:5173                 |
                                   +---------------------------+---------------------------+
                                                               |
                                                    HTTP / API Requests (/api/*)
                                                               |
                                                               v
-                                  +-------------------------------------------------------+
-                                  |                   Nginx Reverse Proxy                 |
-                                  |                 (Port 80 / Reverse Proxy)             |
-                                  +---------------------------+---------------------------+
-                                                              |
-                                                   Proxy Pass to Backend (Port 8000)
-                                                              |
-                                                              v
       +---------------------------------------------------------------------------------------------------------------+
-      |                                           FastAPI Backend Service                                             |
+      |                                      FastAPI Backend (Local Host)                                             |
+      |                                         http://localhost:8000                                                 |
       |                                                                                                               |
       |   +---------------------+   +---------------------+   +---------------------+   +-------------------------+   |
       |   |  JWT Authentication |   | Patient Management  |   | Medical Report OCR  |   |   Google Gemini Chat    |   |
@@ -47,16 +40,14 @@ SmartHealth is a production-ready, full-stack healthcare platform featuring auto
       |   +-------------------------------------------------------------------------------------------------------+   |
       +-------------------------------------------------------+-------------------------------------------------------+
                                                               |
-                                                        SQLAlchemy ORM
+                                                 SQLAlchemy ORM (Port 5432)
                                                               |
                                                               v
                                   +-------------------------------------------------------+
-                                  |                 PostgreSQL 16 Database                |
-                                  |            (Persistent Storage: Docker Volumes)        |
-                                  |                                                       |
-                                  |  - users                 - doctors                    |
-                                  |  - patients              - visits                     |
-                                  |  - medications           - prediction_results         |
+                                  |             PostgreSQL 16 (Docker Container)          |
+                                  |           Container: smarthealth-postgres             |
+                                  |               Port: localhost:5432                    |
+                                  |            Persistent Volume: postgres_data           |
                                   +-------------------------------------------------------+
 ```
 
@@ -65,15 +56,15 @@ SmartHealth is a production-ready, full-stack healthcare platform featuring auto
 ## 💻 Technology Stack
 
 * **Frontend:** React 18, Vite, React Router v6, Tailwind / Custom Modern CSS, Axios, Lucide Icons
-* **Backend:** Python 3.10, FastAPI, Uvicorn, Pydantic v2
-* **Database & ORM:** PostgreSQL 16, SQLAlchemy 2.0, Alembic, psycopg2-binary
+* **Backend:** Python 3.10+, FastAPI, Uvicorn, Pydantic v2
+* **Database:** PostgreSQL 16 (Dockerized), SQLAlchemy 2.0, Alembic, psycopg2-binary
 * **Machine Learning & Deep Learning:**
   * **Diabetes:** Logistic Regression with `StandardScaler`
   * **Heart Disease:** Random Forest Classifier
-  * **Chest X-ray:** DenseNet121 CNN with TensorFlow / Keras 2.15
+  * **Chest X-ray:** DenseNet121 CNN with TensorFlow / Keras
   * **Medical Report OCR:** EasyOCR, Poppler, OpenCV, Pillow
-* **AI Chatbot:** Google Gemini (`gemini-2.0-flash`) via `google-generativeai`
-* **DevOps & Containerization:** Docker, Docker Compose, Nginx
+* **AI Chatbot:** Google Gemini via `google-generativeai`
+* **Containerization:** Docker & Docker Compose (PostgreSQL only)
 
 ---
 
@@ -82,6 +73,8 @@ SmartHealth is a production-ready, full-stack healthcare platform featuring auto
 ```text
 smarthealth-main/
 ├── backend/
+│   ├── alembic/                 # Database migrations
+│   ├── alembic.ini              # Alembic configuration
 │   ├── app/
 │   │   ├── api/routes/          # FastAPI routes (auth, patients, health, chatbot, admin)
 │   │   ├── auth/                # JWT handler, password hashing (bcrypt), dependencies
@@ -91,10 +84,9 @@ smarthealth-main/
 │   ├── models/                  # Trained ML models and weights (diabetes, heart, xray)
 │   ├── schemas/                 # Pydantic request/response schemas
 │   ├── services/                # Prediction services and storage handlers
-│   ├── alembic/                 # Database migrations
-│   ├── alembic.ini              # Alembic configuration
 │   ├── requirements.txt         # Backend Python dependencies
-│   └── Dockerfile               # Backend Docker container specification
+│   ├── .env.example             # Backend environment template
+│   └── venv/                    # Python virtual environment
 │
 ├── frontend/
 │   ├── src/
@@ -104,15 +96,12 @@ smarthealth-main/
 │   │   ├── services/            # Axios API client
 │   │   ├── App.jsx              # Routing and layouts
 │   │   └── main.jsx             # React DOM entry point
-│   ├── nginx.conf               # Production Nginx reverse proxy configuration
 │   ├── package.json             # Frontend dependencies and scripts
-│   ├── vite.config.js           # Vite configuration & dev proxy
-│   └── Dockerfile               # Multi-stage frontend Docker build
+│   └── vite.config.js           # Vite configuration & dev proxy
 │
-├── docker-compose.yml           # Multi-container Docker Compose setup
+├── docker-compose.yml           # PostgreSQL Docker service
 ├── .env.example                 # Environment variables template
 ├── .gitignore                   # Git ignore specifications
-├── .dockerignore                # Docker ignore specifications
 └── README.md                    # Project documentation
 ```
 
@@ -120,7 +109,7 @@ smarthealth-main/
 
 ## ⚙️ Environment Configuration
 
-Copy `.env.example` to `.env` and fill in your configuration:
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
@@ -131,117 +120,71 @@ Key variables:
 | Variable | Description | Default / Example |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+psycopg2://postgres:postgres@localhost:5432/smarthealth` |
-| `JWT_SECRET_KEY` | Secret key for signing JWT tokens | `super-secret-healthcare-key-change-in-production` |
-| `GEMINI_API_KEY` | Google Gemini API Key | `AIzaSy...` |
+| `POSTGRES_DB` | PostgreSQL database name | `smarthealth` |
 | `POSTGRES_USER` | PostgreSQL superuser | `postgres` |
 | `POSTGRES_PASSWORD` | PostgreSQL password | `postgres` |
-| `POSTGRES_DB` | PostgreSQL database name | `smarthealth` |
+| `JWT_SECRET_KEY` | Secret key for signing JWT tokens | `super-secret-healthcare-key-change-in-production` |
+| `GEMINI_API_KEY` | Google Gemini API Key | `your-google-gemini-api-key-here` |
 
 ---
 
-## 🐳 Docker Compose Deployment (Recommended)
+## 🚀 Quick Start Guide
 
-Docker Compose manages the complete multi-container stack: **Frontend**, **Backend**, and **PostgreSQL**.
+### Step 1: Start PostgreSQL (Docker)
 
-### 1. Build and Start All Services
-
-Run the following command in the root directory:
+Start the PostgreSQL database container in detached mode:
 
 ```bash
-docker compose up --build
+docker compose up -d
 ```
 
-To run in detached (background) mode:
+Check running containers (only `smarthealth-postgres` should be running):
 
 ```bash
-docker compose up --build -d
+docker ps
 ```
 
-### 2. Service Endpoints
-
-Once running, the services are available at:
-
-* **Frontend Web Application:** [http://localhost](http://localhost) (Port 80)
-* **Backend API / Interactive Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Backend Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
-* **PostgreSQL Database:** `localhost:5432`
-
-### 3. Manage Docker Services
+To stop PostgreSQL when needed:
 
 ```bash
-# Check status of running containers
-docker compose ps
-
-# View real-time logs for all services
-docker compose logs -f
-
-# View logs for a specific service (frontend, backend, or db)
-docker compose logs -f backend
-
-# Stop all containers
-docker compose stop
-
-# Stop and remove all containers, networks, and volumes
 docker compose down
-
-# Stop and remove containers including data volumes (fresh start)
-docker compose down -v
 ```
 
 ---
 
-## 🛠️ Local Development Setup (Without Docker)
+### Step 2: Start Backend (FastAPI on Host)
 
-### 1. Prerequisites
-* Python 3.10
-* Node.js 18+ and npm
-* PostgreSQL 16 (running locally on port 5432)
+In a terminal:
 
-### 2. Backend Setup
-
-```bash
-# Navigate to backend directory
+```powershell
 cd backend
-
-# Create and activate virtual environment
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run database migrations (optional, or tables auto-create on startup)
-alembic upgrade head
-
-# Start FastAPI server with live reload
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+.\venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Backend interactive API documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Backend Base URL:** [http://localhost:8000](http://localhost:8000)
+* **Interactive Swagger Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
 
-### 3. Frontend Setup
+---
 
-```bash
-# In a new terminal, navigate to frontend directory
+### Step 3: Start Frontend (React / Vite on Host)
+
+In a separate terminal:
+
+```powershell
 cd frontend
-
-# Install npm dependencies
 npm install
-
-# Start Vite development server
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+* **Frontend Application:** [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 🔒 Security & Persistence Best Practices
+## 🔒 Security & Persistence
 
-1. **Secrets Isolation:** Sensitive variables (JWT secret, DB credentials, Gemini API key) are stored in `.env` and not tracked in Git.
-2. **Network Segregation:** PostgreSQL and backend communicate securely over the internal Docker network `smarthealth-network`.
-3. **Persistent Storage:** Database records persist across container restarts via the named Docker volume `postgres_data`.
-4. **Health Checks:** Container health checks ensure dependent services only start when the database is fully ready.
+1. **Database Persistence:** PostgreSQL data is stored in the Docker named volume `postgres_data` and persists across container restarts.
+2. **Localhost Binding:** PostgreSQL is exposed on `localhost:5432`.
+3. **CORS Security:** The FastAPI backend is configured to accept requests exclusively from the local frontend origins (`http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`).
+
