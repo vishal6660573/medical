@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────
+# Python version: 3.10
+# Create env: conda create -n smarthealth310 python=3.10 -y
+# Install:     pip install -r requirements.txt
+# ─────────────────────────────────────────────
+
+# Web framework
+fastapi==0.110.0
+uvicorn==0.27.1
+python-multipart
+
+# Data validation
+pydantic==2.6.1
+pydantic-settings==2.2.1
+email-validator==2.1.1
+
+# Database
+sqlalchemy==2.0.28
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Auth
+bcrypt==4.1.3
+python-jose[cryptography]==3.3.0
+
+# ML & data
+numpy==1.26.4
+pandas==2.2.0
+scikit-learn==1.4.0
+joblib==1.3.2
+
+# Image processing
+pillow==10.2.0
+opencv-python==4.9.0.80
+
+# OCR
+easyocr==1.7.1
+pdf2image==1.17.0
+
+# ─────────────────────────────────────────────
+# Deep Learning
+# TF 2.15 + keras 2.15 — required to load .h5
+# models trained with old Keras 2.x API
+# DO NOT upgrade keras to 3.x — it breaks .h5 loading
+# ─────────────────────────────────────────────
+tensorflow==2.15.0
+keras==2.15.0
+
+# Protobuf compatible with TF 2.15 + google-generativeai
+protobuf==4.25.3
+
+# AI Chatbot
+google-generativeai==0.5.4

@@ -1,0 +1,26 @@
+{
+    "timestamp": "2026-09-11T07:37:36Z",
+    "model_name": "RandomForest",
+    "selected_hyperparameters": {
+        "model__max_depth": "4",
+        "model__max_features": "sqrt",
+        "model__min_samples_leaf": "2",
+        "model__min_samples_split": "5",
+        "model__n_estimators": "200"
+    },
+    "cv_roc_auc_score": 0.892842584146932,
+    "test_roc_auc_score": 0.9610389610389611,
+    "dataset_dimensions": {
+        "train_rows": 242,
+        "test_rows": 61,
+        "features": 13
+    },
+    "environment": {
+        "python_version": "3.10.20",
+        "os": "Windows-10-10.0.26200-SP0",
+        "pandas_version": "2.3.3",
+        "numpy_version": "1.26.4",
+        "sklearn_version": "1.5.3",
+        "random_state": 42
+    }
+}

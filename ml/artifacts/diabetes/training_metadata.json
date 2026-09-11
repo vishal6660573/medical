@@ -1,0 +1,24 @@
+{
+    "timestamp": "2026-09-11T07:37:02Z",
+    "model_name": "LogisticRegression",
+    "selected_hyperparameters": {
+        "model__C": "0.05",
+        "model__penalty": "l2",
+        "model__solver": "liblinear"
+    },
+    "cv_roc_auc_score": 0.8449335548172758,
+    "test_roc_auc_score": 0.8081481481481482,
+    "dataset_dimensions": {
+        "train_rows": 614,
+        "test_rows": 154,
+        "features": 8
+    },
+    "environment": {
+        "python_version": "3.10.20",
+        "os": "Windows-10-10.0.26200-SP0",
+        "pandas_version": "2.3.3",
+        "numpy_version": "1.26.4",
+        "sklearn_version": "1.5.3",
+        "random_state": 42
+    }
+}

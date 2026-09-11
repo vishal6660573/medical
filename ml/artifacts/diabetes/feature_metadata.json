@@ -1,0 +1,26 @@
+{
+    "feature_names": [
+        "Pregnancies",
+        "Glucose",
+        "BloodPressure",
+        "SkinThickness",
+        "Insulin",
+        "BMI",
+        "DiabetesPedigreeFunction",
+        "Age"
+    ],
+    "target_name": "Outcome",
+    "class_mapping": {
+        "0": "Non-Diabetic",
+        "1": "Diabetic"
+    },
+    "biological_imputed_columns": [
+        "Glucose",
+        "BloodPressure",
+        "SkinThickness",
+        "Insulin",
+        "BMI"
+    ],
+    "imputation_strategy": "median",
+    "scaling_strategy": "StandardScaler"
+}

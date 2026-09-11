@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-09-11T07:38:41Z",
+    "model_architecture": "DenseNet121 Transfer Learning",
+    "image_dimensions": [
+        224,
+        224,
+        3
+    ],
+    "batch_size": 16,
+    "epochs_trained": 10,
+    "learning_rate": 0.0001,
+    "classes": {
+        "COVID": 0,
+        "NORMAL": 1,
+        "PNEUMONIA": 2
+    },
+    "test_accuracy": 1.0,
+    "test_ovr_roc_auc": 1.0,
+    "training_duration_seconds": 50.62908434867859,
+    "environment": {
+        "tensorflow_version": "2.15.0",
+        "python_version": "3.10.20",
+        "gpu_available": false
+    }
+}

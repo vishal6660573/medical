@@ -1,0 +1,24 @@
+{
+    "feature_names": [
+        "age",
+        "sex",
+        "cp",
+        "trestbps",
+        "chol",
+        "fbs",
+        "restecg",
+        "thalach",
+        "exang",
+        "oldpeak",
+        "slope",
+        "ca",
+        "thal"
+    ],
+    "target_name": "num",
+    "class_mapping": {
+        "0": "No Disease",
+        "1": "Heart Disease"
+    },
+    "feature_count": 13,
+    "imputation_strategy": "median"
+}
