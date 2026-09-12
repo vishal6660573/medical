@@ -1,6 +1,6 @@
 # SmartHealth — Intelligent Healthcare & Disease Prediction Platform
 
-SmartHealth is a full-stack healthcare platform featuring automated disease prediction (Diabetes, Heart Disease, Chest X-ray analysis), medical report OCR parsing, patient records management, doctor consultations, and an AI-powered medical assistant powered by Ollama (Local LLM).
+SmartHealth is a full-stack healthcare platform featuring automated disease prediction (Diabetes, Heart Disease, Chest X-ray analysis), patient records management, doctor consultations, and an AI-powered medical assistant powered by Ollama (Local LLM).
 
 ---
 
@@ -27,10 +27,10 @@ Docker is used **ONLY** for running the PostgreSQL 16 database. The FastAPI back
       |                                      FastAPI Backend (Local Host)                                             |
       |                                         http://localhost:8000                                                 |
       |                                                                                                               |
-      |   +---------------------+   +---------------------+   +---------------------+   +-------------------------+   |
-      |   |  JWT Authentication |   | Patient Management  |   | Medical Report OCR  |   |    Ollama Local LLM     |   |
-      |   |   & Role Access     |   |   & Doctor Visits   |   | (EasyOCR + Poppler) |   |        (MediBot)        |   |
-      |   +---------------------+   +---------------------+   +---------------------+   +-------------------------+   |
+      |   +---------------------+   +---------------------+   +---------------------------------------------------+   |
+      |   |  JWT Authentication |   | Patient Management  |   |                Ollama Local LLM                   |   |
+      |   |   & Role Access     |   |   & Doctor Visits   |   |                   (MediBot)                       |   |
+      |   +---------------------+   +---------------------+   +---------------------------------------------------+   |
       |                                                                                                               |
       |   +-------------------------------------------------------------------------------------------------------+   |
       |   |                                          Machine Learning Models                                      |   |
@@ -62,7 +62,6 @@ Docker is used **ONLY** for running the PostgreSQL 16 database. The FastAPI back
   * **Diabetes:** Logistic Regression with `StandardScaler`
   * **Heart Disease:** Random Forest Classifier
   * **Chest X-ray:** DenseNet121 CNN with TensorFlow / Keras
-  * **Medical Report OCR:** EasyOCR, Poppler, OpenCV, Pillow
 * **AI Chatbot:** Ollama Local LLM via `httpx`
 * **Containerization:** Docker & Docker Compose (PostgreSQL only)
 
@@ -79,8 +78,7 @@ smarthealth-main/
 │   │   ├── api/routes/          # FastAPI routes (auth, patients, health, chatbot, admin)
 │   │   ├── auth/                # JWT handler, password hashing (bcrypt), dependencies
 │   │   ├── core/                # Configuration, logging, exception handlers
-│   │   ├── database/            # SQLAlchemy database engine and models
-│   │   └── ocr/                 # EasyOCR engine and report parser
+│   │   └── database/            # SQLAlchemy database engine and models
 │   ├── models/                  # Trained ML models and weights (diabetes, heart, xray)
 │   ├── schemas/                 # Pydantic request/response schemas
 │   ├── services/                # Prediction services and storage handlers
