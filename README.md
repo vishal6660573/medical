@@ -1,6 +1,6 @@
 # SmartHealth — Intelligent Healthcare & Disease Prediction Platform
 
-SmartHealth is a full-stack healthcare platform featuring automated disease prediction (Diabetes, Heart Disease, Chest X-ray analysis), medical report OCR parsing, patient records management, doctor consultations, and an AI-powered medical assistant powered by Google Gemini.
+SmartHealth is a full-stack healthcare platform featuring automated disease prediction (Diabetes, Heart Disease, Chest X-ray analysis), medical report OCR parsing, patient records management, doctor consultations, and an AI-powered medical assistant powered by Ollama (Local LLM).
 
 ---
 
@@ -28,7 +28,7 @@ Docker is used **ONLY** for running the PostgreSQL 16 database. The FastAPI back
       |                                         http://localhost:8000                                                 |
       |                                                                                                               |
       |   +---------------------+   +---------------------+   +---------------------+   +-------------------------+   |
-      |   |  JWT Authentication |   | Patient Management  |   | Medical Report OCR  |   |   Google Gemini Chat    |   |
+      |   |  JWT Authentication |   | Patient Management  |   | Medical Report OCR  |   |    Ollama Local LLM     |   |
       |   |   & Role Access     |   |   & Doctor Visits   |   | (EasyOCR + Poppler) |   |        (MediBot)        |   |
       |   +---------------------+   +---------------------+   +---------------------+   +-------------------------+   |
       |                                                                                                               |
@@ -63,7 +63,7 @@ Docker is used **ONLY** for running the PostgreSQL 16 database. The FastAPI back
   * **Heart Disease:** Random Forest Classifier
   * **Chest X-ray:** DenseNet121 CNN with TensorFlow / Keras
   * **Medical Report OCR:** EasyOCR, Poppler, OpenCV, Pillow
-* **AI Chatbot:** Google Gemini via `google-generativeai`
+* **AI Chatbot:** Ollama Local LLM via `httpx`
 * **Containerization:** Docker & Docker Compose (PostgreSQL only)
 
 ---
@@ -124,7 +124,8 @@ Key variables:
 | `POSTGRES_USER` | PostgreSQL superuser | `postgres` |
 | `POSTGRES_PASSWORD` | PostgreSQL password | `postgres` |
 | `JWT_SECRET_KEY` | Secret key for signing JWT tokens | `super-secret-healthcare-key-change-in-production` |
-| `GEMINI_API_KEY` | Google Gemini API Key | `your-google-gemini-api-key-here` |
+| `OLLAMA_BASE_URL` | Ollama Host URL | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Ollama Model Name | `llama3.2` |
 
 ---
 
@@ -187,4 +188,3 @@ npm run dev
 1. **Database Persistence:** PostgreSQL data is stored in the Docker named volume `postgres_data` and persists across container restarts.
 2. **Localhost Binding:** PostgreSQL is exposed on `localhost:5432`.
 3. **CORS Security:** The FastAPI backend is configured to accept requests exclusively from the local frontend origins (`http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`).
-

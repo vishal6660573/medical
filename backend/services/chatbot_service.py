@@ -1,11 +1,7 @@
 from typing import Optional
-import google.generativeai as genai
+import httpx
 from app.core.config import settings
 from app.core.logs import logger
-
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
-GEMINI_MODEL = "gemini-2.0-flash"
 
 SYSTEM_PROMPT = """You are MediBot, a knowledgeable and compassionate AI medical assistant integrated into the MediSense Smart Healthcare Platform.
 
@@ -63,10 +59,19 @@ async def chat_with_medibot(
 ) -> str:
     prompt = _build_prompt(message, history, patient_context)
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
-        response = await model.generate_content_async(prompt)
-        reply = response.text.strip()
-        logger.info(f"MediBot responded | model={GEMINI_MODEL} | history_len={len(history)}")
+        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        payload = {
+            "model": settings.OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+        }
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            reply = data.get("response", "").strip()
+
+        logger.info(f"MediBot responded | model={settings.OLLAMA_MODEL} | history_len={len(history)}")
         return reply
     except Exception as e:
         logger.error(f"MediBot error: {str(e)}")

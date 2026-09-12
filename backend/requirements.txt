@@ -46,8 +46,8 @@ pdf2image==1.17.0
 tensorflow==2.15.0
 keras==2.15.0
 
-# Protobuf compatible with TF 2.15 + google-generativeai
+# Protobuf compatible with TF 2.15
 protobuf==4.25.3
 
-# AI Chatbot
-google-generativeai==0.5.4
+# AI Chatbot (Ollama API Client)
+httpx==0.27.0

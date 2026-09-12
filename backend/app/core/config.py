@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/smarthealth"
 
-    # Gemini
-    GEMINI_API_KEY: str = ""
+    # Ollama
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2"
 
     class Config:
         env_file = (".env", "../.env")
