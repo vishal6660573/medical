@@ -28,7 +28,12 @@ yarn-debug.log*
 yarn-error.log*
 
 # ML runs & temporary data
-data/
+data/*
+!data/medical_knowledge/
+!data/medical_knowledge/*
+!data/diabetes.csv
+!data/heart.csv
+ml/data/
 mlruns/
 
 # Logs

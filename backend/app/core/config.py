@@ -16,9 +16,16 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/smarthealth"
 
-    # Ollama
+    # Ollama LLM & Embeddings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2"
+    OLLAMA_EMBED_MODEL: str = "nomic-embed-text"
+
+    # RAG Settings
+    RAG_ENABLED: bool = True
+    RAG_TOP_K: int = 3
+    DOCS_DIR: str = "data/medical_knowledge"
+    EMBEDDING_DIM: int = 768
 
     class Config:
         env_file = (".env", "../.env")

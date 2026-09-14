@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { sendChatMessage } from '../services/api'
-import { MessageCircle, X, Send, Bot, User, Minimize2, AlertCircle } from 'lucide-react'
+import { MessageCircle, X, Send, Bot, User, Minimize2, AlertCircle, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
+
+function boldify(text) {
+  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+}
 
 function MessageText({ text }) {
   const lines = text.split('\n')
@@ -23,8 +27,61 @@ function MessageText({ text }) {
   )
 }
 
-function boldify(text) {
-  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+function SourcesBadge({ sources }) {
+  const [expanded, setExpanded] = useState(false)
+  if (!sources || sources.length === 0) return null
+
+  return (
+    <div style={{
+      marginTop: 8,
+      padding: '6px 10px',
+      background: 'rgba(13, 180, 214, 0.08)',
+      border: '1px solid rgba(13, 180, 214, 0.2)',
+      borderRadius: 8,
+      fontSize: '0.75rem',
+    }}>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          color: 'var(--teal)',
+          fontWeight: 600,
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <BookOpen size={13} />
+          {sources.length} Medical Knowledge Source{sources.length > 1 ? 's' : ''} (RAG)
+        </span>
+        {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+      </div>
+
+      {expanded && (
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {sources.map((src, idx) => (
+            <div key={idx} style={{
+              padding: '4px 6px',
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: 4,
+              color: 'var(--text-mid)',
+              fontSize: '0.72rem'
+            }}>
+              <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                {src.document_title || 'Clinical Reference'}
+              </div>
+              {src.section && (
+                <div style={{ color: 'var(--text-dim)', fontSize: '0.68rem' }}>
+                  Section: {src.section}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 const SUGGESTED = [
@@ -40,7 +97,8 @@ export default function ChatbotWidget() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: "Hi! I'm **MediBot**, your AI medical assistant. I can help with health questions, symptom information, and general wellness advice.\n\n⚠️ Always consult a qualified doctor for diagnosis or treatment."
+      content: "Hi! I'm **MediBot**, your AI medical assistant powered by **RAG Clinical Guidelines** and Llama 3.2.\n\n⚠️ Always consult a qualified doctor for diagnosis or treatment decisions.",
+      sources: []
     }
   ])
   const [input, setInput] = useState('')
@@ -65,76 +123,110 @@ export default function ChatbotWidget() {
     if (!msg || loading) return
     setInput('')
 
-    // Add user message to display
+    // Add user message
     const userMsg = { role: 'user', content: msg }
     setMessages(prev => [...prev, userMsg])
     setLoading(true)
 
     try {
-      // Send PREVIOUS messages as history (skip welcome message at index 0)
-      // Current message is sent separately as body.message
+      // Send previous messages as history
       const history = messages
-        .slice(1)                          // skip the welcome assistant message
+        .slice(1)
         .map(m => ({ role: m.role, content: m.content }))
 
       const { data } = await sendChatMessage(msg, history)
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply,
+        sources: data.sources || []
+      }])
       if (!open) setUnread(u => u + 1)
     } catch (err) {
       const status = err?.response?.status
-      const detail = err?.response?.data?.detail
+      const detail = err?.response?.data?.detail || ''
 
-      let errorMsg = "Sorry, I'm having trouble connecting. Please try again."
+      let errorMsg = "Sorry, I'm having trouble connecting. Please ensure Ollama is running (`ollama serve`)."
       if (status === 429 || detail === 'rate_limit') {
-        errorMsg = "⏳ Too many requests right now (free tier limit). Please wait **20–30 seconds** and try again."
-      } else if (status === 503 || detail === 'unavailable') {
-        errorMsg = "MediBot is temporarily unavailable. Please check the backend is running and your Gemini API key is set in `.env`."
+        errorMsg = "⏳ Too many requests right now. Please wait **20–30 seconds** and try again."
+      } else if (status === 503 || detail.includes('Ollama')) {
+        errorMsg = "⚠️ **Ollama is offline or unreachable**.\n\nPlease start Ollama in your terminal:\n`ollama serve`\n\nAnd verify the model is pulled:\n`ollama pull llama3.2`"
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }])
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg, sources: [] }])
     } finally {
       setLoading(false)
     }
   }
 
   const handleKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      send()
+    }
   }
 
   return (
     <>
       {!open && (
-        <button onClick={() => setOpen(true)} style={{
-          position: 'fixed', bottom: 28, right: 28, zIndex: 1000,
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #0db4d6, #0891b2)',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 24px #0db4d650', transition: 'transform 0.2s',
-        }}
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: 28,
+            right: 28,
+            zIndex: 1000,
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0db4d6, #0891b2)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 24px #0db4d650',
+            transition: 'transform 0.2s',
+          }}
           onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
         >
           <MessageCircle size={24} color="#03080d" fill="#03080d" />
           {unread > 0 && (
             <div style={{
-              position: 'absolute', top: -4, right: -4,
-              background: 'var(--red)', color: '#fff', borderRadius: '50%',
-              width: 20, height: 20, fontSize: '0.7rem', fontWeight: 700,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>{unread}</div>
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              background: 'var(--red)',
+              color: '#fff',
+              borderRadius: '50%',
+              width: 20,
+              height: 20,
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {unread}
+            </div>
           )}
         </button>
       )}
 
       {open && (
         <div style={{
-          position: 'fixed', bottom: 28, right: 28, zIndex: 1000,
-          width: 380, borderRadius: 16,
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          position: 'fixed',
+          bottom: 28,
+          right: 28,
+          zIndex: 1000,
+          width: 390,
+          borderRadius: 16,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
           boxShadow: '0 8px 48px #000c',
-          display: 'flex', flexDirection: 'column',
-          height: minimized ? 'auto' : 560,
+          display: 'flex',
+          flexDirection: 'column',
+          height: minimized ? 'auto' : 580,
           overflow: 'hidden',
           animation: 'chatSlideUp 0.25s cubic-bezier(.4,0,.2,1)',
         }}>
@@ -144,14 +236,21 @@ export default function ChatbotWidget() {
             padding: '14px 16px',
             background: 'linear-gradient(135deg, #0d2035, #0a1825)',
             borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             flexShrink: 0,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
-                width: 34, height: 34, borderRadius: '50%',
-                background: 'var(--teal-dim)', border: '1px solid var(--teal)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                background: 'var(--teal-dim)',
+                border: '1px solid var(--teal)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}>
                 <Bot size={18} color="var(--teal)" />
               </div>
@@ -159,49 +258,81 @@ export default function ChatbotWidget() {
                 <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>MediBot</div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ width: 6, height: 6, background: 'var(--green)', borderRadius: '50%', display: 'inline-block' }} />
-                  AI Medical Assistant
+                  RAG-Powered AI Assistant
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setMinimized(m => !m)} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-mid)', padding: 4, borderRadius: 6,
-                display: 'flex', alignItems: 'center'
-              }}><Minimize2 size={15} /></button>
-              <button onClick={() => setOpen(false)} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-mid)', padding: 4, borderRadius: 6,
-                display: 'flex', alignItems: 'center'
-              }}><X size={15} /></button>
+              <button
+                onClick={() => setMinimized(m => !m)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-mid)',
+                  padding: 4,
+                  borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <Minimize2 size={15} />
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-mid)',
+                  padding: 4,
+                  borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <X size={15} />
+              </button>
             </div>
           </div>
 
           {!minimized && (
             <>
-              {/* Messages */}
+              {/* Messages Container */}
               <div style={{
-                flex: 1, overflowY: 'auto', padding: '16px 14px',
-                display: 'flex', flexDirection: 'column', gap: 12,
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
               }}>
                 {messages.map((msg, i) => (
                   <div key={i} style={{
-                    display: 'flex', gap: 8,
+                    display: 'flex',
+                    gap: 8,
                     flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
                     alignItems: 'flex-start',
                   }}>
                     <div style={{
-                      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      flexShrink: 0,
                       background: msg.role === 'user' ? 'var(--teal-mid)' : '#0d2035',
                       border: `1px solid ${msg.role === 'user' ? 'var(--teal)' : 'var(--border)'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}>
                       {msg.role === 'user'
                         ? <User size={14} color="var(--teal)" />
                         : <Bot size={14} color="var(--teal)" />}
                     </div>
                     <div style={{
-                      maxWidth: '80%', padding: '10px 13px', borderRadius: 12,
+                      maxWidth: '82%',
+                      padding: '10px 13px',
+                      borderRadius: 12,
                       background: msg.role === 'user' ? 'var(--teal)' : 'var(--bg-elevated)',
                       color: msg.role === 'user' ? '#03080d' : 'var(--text)',
                       border: msg.role === 'user' ? 'none' : '1px solid var(--border)',
@@ -209,6 +340,7 @@ export default function ChatbotWidget() {
                       borderTopLeftRadius: msg.role === 'assistant' ? 4 : 12,
                     }}>
                       <MessageText text={msg.content} />
+                      {msg.role === 'assistant' && <SourcesBadge sources={msg.sources} />}
                     </div>
                   </div>
                 ))}
@@ -216,20 +348,34 @@ export default function ChatbotWidget() {
                 {loading && (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <div style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: '#0d2035', border: '1px solid var(--border)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: '#0d2035',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}>
                       <Bot size={14} color="var(--teal)" />
                     </div>
                     <div style={{
-                      padding: '12px 16px', background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border)', borderRadius: 12, borderTopLeftRadius: 4,
-                      display: 'flex', gap: 5, alignItems: 'center',
+                      padding: '12px 16px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 12,
+                      borderTopLeftRadius: 4,
+                      display: 'flex',
+                      gap: 5,
+                      alignItems: 'center',
                     }}>
                       {[0, 0.2, 0.4].map((delay, i) => (
                         <span key={i} style={{
-                          width: 7, height: 7, borderRadius: '50%', background: 'var(--teal)',
+                          width: 7,
+                          height: 7,
+                          borderRadius: '50%',
+                          background: 'var(--teal)',
                           animation: `typingDot 1.2s ${delay}s ease-in-out infinite`,
                           display: 'inline-block',
                         }} />
@@ -245,15 +391,32 @@ export default function ChatbotWidget() {
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {SUGGESTED.map((q, i) => (
-                        <button key={i} onClick={() => send(q)} style={{
-                          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                          borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
-                          color: 'var(--text-mid)', fontSize: '0.78rem', textAlign: 'left',
-                          fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--teal)'; e.currentTarget.style.color = 'var(--teal)' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-mid)' }}
-                        >{q}</button>
+                        <button
+                          key={i}
+                          onClick={() => send(q)}
+                          style={{
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 8,
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            color: 'var(--text-mid)',
+                            fontSize: '0.78rem',
+                            textAlign: 'left',
+                            fontFamily: 'var(--font-sans)',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.borderColor = 'var(--teal)'
+                            e.currentTarget.style.color = 'var(--teal)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.borderColor = 'var(--border)'
+                            e.currentTarget.style.color = 'var(--text-mid)'
+                          }}
+                        >
+                          {q}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -262,22 +425,30 @@ export default function ChatbotWidget() {
                 <div ref={bottomRef} />
               </div>
 
-              {/* Disclaimer */}
+              {/* Clinical Safety Disclaimer */}
               <div style={{
-                padding: '6px 14px', background: '#f5a62308',
+                padding: '6px 14px',
+                background: '#f5a62308',
                 borderTop: '1px solid #f5a62320',
-                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                flexShrink: 0,
               }}>
                 <AlertCircle size={11} color="var(--amber)" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.68rem', color: 'var(--amber)', opacity: 0.8 }}>
-                  Not a substitute for professional medical advice
+                <span style={{ fontSize: '0.68rem', color: 'var(--amber)', opacity: 0.85 }}>
+                  Clinical guidance only. Not a replacement for physician diagnosis.
                 </span>
               </div>
 
-              {/* Input */}
+              {/* Input Box */}
               <div style={{
-                padding: '12px 14px', borderTop: '1px solid var(--border)',
-                display: 'flex', gap: 8, alignItems: 'flex-end', flexShrink: 0,
+                padding: '12px 14px',
+                borderTop: '1px solid var(--border)',
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-end',
+                flexShrink: 0,
                 background: 'var(--bg-card)',
               }}>
                 <textarea
@@ -285,27 +456,43 @@ export default function ChatbotWidget() {
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="Ask a health question..."
+                  placeholder="Ask a health or medical question..."
                   rows={1}
                   style={{
-                    flex: 1, resize: 'none', background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)', borderRadius: 10,
-                    padding: '9px 12px', color: 'var(--text)',
-                    fontFamily: 'var(--font-sans)', fontSize: '0.85rem',
-                    outline: 'none', lineHeight: 1.5, maxHeight: 100,
+                    flex: 1,
+                    resize: 'none',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    padding: '9px 12px',
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    lineHeight: 1.5,
+                    maxHeight: 100,
                     transition: 'border-color 0.15s',
                   }}
                   onFocus={e => e.target.style.borderColor = 'var(--teal)'}
                   onBlur={e => e.target.style.borderColor = 'var(--border)'}
                 />
-                <button onClick={() => send()} disabled={!input.trim() || loading} style={{
-                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  background: input.trim() && !loading ? 'var(--teal)' : 'var(--bg-elevated)',
-                  border: `1px solid ${input.trim() && !loading ? 'var(--teal)' : 'var(--border)'}`,
-                  cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.15s',
-                }}>
+                <button
+                  onClick={() => send()}
+                  disabled={!input.trim() || loading}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    flexShrink: 0,
+                    background: input.trim() && !loading ? 'var(--teal)' : 'var(--bg-elevated)',
+                    border: `1px solid ${input.trim() && !loading ? 'var(--teal)' : 'var(--border)'}`,
+                    cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}
+                >
                   <Send size={15} color={input.trim() && !loading ? '#03080d' : 'var(--text-dim)'} />
                 </button>
               </div>

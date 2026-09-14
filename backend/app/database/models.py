@@ -166,3 +166,22 @@ class PredictionResult(Base):
 
     # Relationships
     patient         = relationship("Patient", back_populates="predictions")
+
+
+# ─────────────────────────────────────────────
+# MedicalDocumentChunk — RAG Vector Knowledge Base
+# ─────────────────────────────────────────────
+
+class MedicalDocumentChunk(Base):
+    __tablename__ = "medical_document_chunks"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    document_title  = Column(String(255), index=True, nullable=False)
+    source_file     = Column(String(255), nullable=False)
+    section         = Column(String(255), nullable=True)
+    chunk_index     = Column(Integer, default=0)
+    content         = Column(Text, nullable=False)
+    embedding_json  = Column(Text, nullable=True)   # JSON-serialized embedding vector
+    meta_info       = Column(Text, nullable=True)   # JSON string for extra metadata
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+

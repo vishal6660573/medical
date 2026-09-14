@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getMyProfile, getVisits, getMedications, getPredictions, updateMyProfile } from '../services/api'
 import { Activity, Heart, Scan, FileText, Pill, BarChart2, Edit2, Save, X } from 'lucide-react'
@@ -23,14 +23,20 @@ function RiskBar({ probability, riskLevel }) {
 
 export default function PatientDashboard() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [profile, setProfile] = useState(null)
   const [visits, setVisits] = useState([])
   const [meds, setMeds] = useState([])
   const [preds, setPreds] = useState([])
-  const [tab, setTab] = useState('overview')
+  const [tab, setTab] = useState(searchParams.get('tab') || 'overview')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t) setTab(t)
+  }, [searchParams])
 
   useEffect(() => {
     Promise.all([getMyProfile(), ]).then(([p]) => {
@@ -97,7 +103,7 @@ export default function PatientDashboard() {
       {/* Tabs */}
       <div className="tabs">
         {[['overview','Overview'],['visits','Visits'],['medications','Medications'],['predictions','Predictions'],['profile','Profile']].map(([k,l]) => (
-          <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{l}</button>
+          <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => { setTab(k); setSearchParams({ tab: k }); }}>{l}</button>
         ))}
       </div>
 

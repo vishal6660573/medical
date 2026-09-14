@@ -58,13 +58,13 @@ export default function Sidebar() {
         {!isDoctor && (
           <>
             <span className="sidebar-section" style={{ marginTop:12 }}>My Records</span>
-            <NavLink to="/patient/visits" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/patient?tab=visits" className={() => `sidebar-link`}>
               <FileText size={16}/> Visit History
             </NavLink>
-            <NavLink to="/patient/medications" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/patient?tab=medications" className={() => `sidebar-link`}>
               <Pill size={16}/> Medications
             </NavLink>
-            <NavLink to="/patient/predictions" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/patient?tab=predictions" className={() => `sidebar-link`}>
               <BarChart2 size={16}/> Prediction History
             </NavLink>
           </>

@@ -29,6 +29,18 @@ def get_db():
 
 
 def create_tables():
-    """Create all tables on startup."""
+    """Create all tables on startup, enabling pgvector extension if on PostgreSQL."""
     from app.database import models  # noqa: F401 — ensures models are registered
+    from app.core.logs import logger
+    
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        try:
+            with engine.connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                conn.commit()
+                logger.info("pgvector extension verified/created in PostgreSQL")
+        except Exception as e:
+            logger.warning(f"Could not enable pgvector extension (using vector fallback): {e}")
+
     Base.metadata.create_all(bind=engine)

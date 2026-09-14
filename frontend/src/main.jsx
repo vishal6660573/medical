@@ -1,8 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+//ReactDOM is responsible for connecting React to the actual HTML DOM in the browser
 import { BrowserRouter } from 'react-router-dom'
+//This comes from React Router. It allows your React application to have multiple URLs/pages without doing a full browser reload.
 import { Toaster } from 'react-hot-toast'
+//react-hot-toast is a library for displaying notification messages.
 import App from './App'
+//This imports your main React component.
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(

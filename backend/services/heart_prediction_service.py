@@ -1,31 +1,29 @@
 import os
+from pathlib import Path
 import joblib
-import numpy as np
+import pandas as pd
 from app.core.logs import logger
 
-# Get absolute path to project root
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = os.path.join(
-    BASE_DIR,
-    "models",
-    "heart",
-    "model.pkl"
-)
+MODEL_PATH = BASE_DIR / "models" / "heart" / "model.pkl"
 
 # Load trained model
 model = joblib.load(MODEL_PATH)
 
+FEATURE_COLUMNS = [
+    "age", "sex", "cp", "trestbps", "chol", "fbs",
+    "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"
+]
+
 def predict_heart_disease(data):
     """
-    Predict heart disease risk using Random Forest model
+    Predict heart disease risk using tuned Random Forest model
     """
-
     try:
         logger.info("Heart disease prediction request received")
 
-        # Convert input data to numpy array (same order as training)
-        features = np.array([[
+        df_input = pd.DataFrame([[
             data.age,
             data.sex,
             data.cp,
@@ -39,12 +37,12 @@ def predict_heart_disease(data):
             data.slope,
             data.ca,
             data.thal
-        ]])
+        ]], columns=FEATURE_COLUMNS)
 
         # Predict probability
-        probability = model.predict_proba(features)[0][1]
+        probability = model.predict_proba(df_input)[0][1]
 
-        logger.info(f"Heart disease prediction successful | Probability={probability}")
+        logger.info(f"Heart disease prediction successful | Probability={probability:.4f}")
 
         return {
             "probability": round(float(probability), 2),
