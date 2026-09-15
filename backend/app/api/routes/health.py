@@ -17,7 +17,7 @@ from schemas.heart import HeartInput
 # ML Services
 from services.diabetes_prediction_service import predict_diabetes
 from services.heart_prediction_service import predict_heart_disease
-from models.xray.prediction_service import predict_xray
+from services.xray_prediction_service import predict_xray
 
 # Phase 2 — DB save helper
 from services.prediction_store import save_prediction

@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     DOCS_DIR: str = "data/medical_knowledge"
     EMBEDDING_DIM: int = 768
 
+    # Wikipedia Fallback Settings
+    WIKIPEDIA_ENABLED: bool = True
+    WIKIPEDIA_MAX_CHARS: int = 2500
+    WIKIPEDIA_USER_AGENT: str = "SmartHealthPlatform/1.0 (medical-bot; contact@smarthealth.local)"
+    WIKIPEDIA_TIMEOUT: float = 5.0
+
     class Config:
         env_file = (".env", "../.env")
         env_file_encoding = "utf-8"

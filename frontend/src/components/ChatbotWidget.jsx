@@ -76,6 +76,16 @@ function SourcesBadge({ sources }) {
                   Section: {src.section}
                 </div>
               )}
+              {(src.url || (src.source_file && src.source_file.startsWith('http'))) && (
+                <a
+                  href={src.url || src.source_file}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--teal)', fontSize: '0.68rem', textDecoration: 'underline', marginTop: 2, display: 'inline-block' }}
+                >
+                  View external reference ↗
+                </a>
+              )}
             </div>
           ))}
         </div>

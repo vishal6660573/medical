@@ -31,12 +31,15 @@ class SourceItem(BaseModel):
     source_file: Optional[str] = None
     score: Optional[float] = None
     snippet: Optional[str] = None
+    url: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     reply: str
     role: str = "assistant"
     sources: List[SourceItem] = []
+    query_type: Optional[str] = None
+    source: Optional[str] = None
 
 
 def _get_patient_context(user: User, db: Session) -> Optional[dict]:
@@ -50,6 +53,7 @@ def _get_patient_context(user: User, db: Session) -> Optional[dict]:
         Medication.is_active == True
     ).all()]
     return {
+        "patient_id": patient.id,
         "full_name": user.full_name,
         "gender": patient.gender.value if patient.gender else None,
         "blood_group": patient.blood_group.value if patient.blood_group else None,
@@ -70,15 +74,22 @@ async def chat(
             patient_context = _get_patient_context(current_user, db)
 
         history = [{"role": m.role, "content": m.content} for m in body.history]
-        logger.info(f"Chatbot | user={current_user.id} | history={len(history)} | msg={body.message[:60]}")
+        logger.info(f"Chatbot | user={current_user.id} | history={len(history)} | msg_len={len(body.message)}")
 
-        reply, sources = await chat_with_medibot(
+        result = await chat_with_medibot(
             message=body.message,
             history=history,
             patient_context=patient_context,
+            current_user=current_user,
             db=db
         )
-        return ChatResponse(reply=reply, sources=sources)
+        return ChatResponse(
+            reply=result.reply,
+            role="assistant",
+            sources=result.sources,
+            query_type=result.query_type,
+            source=result.source
+        )
 
     except Exception as e:
         err_str = str(e)

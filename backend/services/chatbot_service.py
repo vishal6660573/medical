@@ -1,122 +1,140 @@
-from typing import Optional, List, Dict, Any, Tuple
-import httpx
+from typing import Optional, List, Dict, Any, Tuple, NamedTuple
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logs import logger
+from app.database.models import User, Patient, UserRole
 from app.rag.embeddings import get_embedding_service
 from app.rag.vector_store import get_vector_store
-
-SYSTEM_PROMPT = """You are MediBot, an empathetic, highly knowledgeable AI clinical assistant integrated into the MediSense Smart Healthcare Platform.
-
-Your role:
-- Help patients understand their symptoms, medications, lab values, and general wellness.
-- Assist clinicians with quick reference summaries, guideline recommendations, and differential considerations.
-- Ground your medical advice in trusted medical literature and clinical guidelines.
-
-Strict Clinical & Ethical Safety Rules:
-1. ALWAYS state clearly that you provide informational guidance, not a definitive medical diagnosis.
-2. NEVER prescribe prescription dosages or recommend changes to a doctor's prescribed regimen.
-3. RED FLAG EMERGENCIES: If the user describes sudden crushing chest pain, difficulty breathing, FAST stroke signs (facial droop, arm weakness, slurred speech), or severe anaphylaxis, IMMEDIATELY urge them to call emergency services (108 in India / 911 in North America) or visit the nearest emergency department.
-4. PERSONALIZED CARE: If confidential patient context is provided, consider their allergies and medications when discussing contraindications.
-5. EVIDENCE-BASED: When relevant clinical guidelines are provided in the medical context, use them accurately and cite the guidelines (e.g. ADA, ACC/AHA, ATS).
-6. Format responses clearly with bullet points and bold section highlights for readability."""
+from services.query_router import classify_query, QueryType
+from services.patient_rag_service import get_patient_rag_service
+from services.wikipedia_service import get_wikipedia_service
+from services.ollama_service import get_ollama_service
 
 
-def _build_prompt(
-    message: str,
-    history: list,
-    patient_context: Optional[dict],
-    retrieved_chunks: Optional[List[dict]] = None
-) -> str:
-    parts = [SYSTEM_PROMPT, ""]
-
-    # 1. Patient Context (from PostgreSQL User/Patient/Medication DB - strictly separated)
-    if patient_context:
-        ctx_parts = []
-        if patient_context.get("full_name"):
-            ctx_parts.append(f"Patient Name: {patient_context['full_name']}")
-        if patient_context.get("gender"):
-            ctx_parts.append(f"Gender: {patient_context['gender']}")
-        if patient_context.get("blood_group"):
-            ctx_parts.append(f"Blood Group: {patient_context['blood_group']}")
-        if patient_context.get("allergies"):
-            ctx_parts.append(f"Known Allergies: {patient_context['allergies']}")
-        if patient_context.get("active_medications"):
-            ctx_parts.append(f"Active Prescriptions: {patient_context['active_medications']}")
-
-        if ctx_parts:
-            parts.append("[CONFIDENTIAL PATIENT CONTEXT]")
-            parts.append(" | ".join(ctx_parts))
-            parts.append("Note: Consider allergies and active prescriptions when discussing medication safety.")
-            parts.append("")
-
-    # 2. Retrieved Medical Literature / Clinical Guidelines (from RAG Vector Store)
-    if retrieved_chunks:
-        parts.append("[TRUSTED MEDICAL KNOWLEDGE BASE (RETRIEVED GUIDELINES)]")
-        for i, chunk in enumerate(retrieved_chunks, start=1):
-            title = chunk.get("document_title", "Medical Guideline")
-            section = chunk.get("section", "Reference")
-            content = chunk.get("content", "").strip()
-            parts.append(f"--- Document Source {i}: {title} | Section: {section} ---")
-            parts.append(content)
-            parts.append("")
-        parts.append("Instruction: Use the trusted medical knowledge above to provide clinically accurate explanations.")
-        parts.append("")
-
-    # 3. Conversation History
-    if history:
-        parts.append("[CONVERSATION HISTORY]")
-        for msg in history:
-            role = "Patient/Doctor" if msg.get("role") == "user" else "MediBot"
-            parts.append(f"{role}: {msg.get('content', '')}")
-        parts.append("")
-
-    # 4. Current User Query
-    parts.append("[CURRENT INQUIRY]")
-    parts.append(f"User: {message}")
-    parts.append("")
-    parts.append("MediBot:")
-
-    return "\n".join(parts)
+class ChatbotResult(NamedTuple):
+    reply: str
+    sources: List[Dict[str, Any]]
+    query_type: str
+    source: str
 
 
 async def chat_with_medibot(
     message: str,
-    history: list,
+    history: Optional[List[Dict[str, str]]] = None,
     patient_context: Optional[dict] = None,
+    current_user: Optional[User] = None,
     db: Optional[Session] = None
-) -> Tuple[str, List[Dict[str, Any]]]:
+) -> ChatbotResult:
     """
-    RAG-Augmented Medical Chatbot:
-    1. Embeds user query
-    2. Retrieves top-k relevant medical guideline chunks
-    3. Blends patient context + medical context + history
-    4. Queries Ollama (Llama 3.2)
-    5. Returns answer and source citations
+    Intelligent Medical Chatbot Pipeline:
+    
+    Case 1: PATIENT_SPECIFIC
+      -> Route: PATIENT_SPECIFIC
+      -> Retrieve authenticated patient records via Patient RAG
+      -> Generate answer strictly grounded in patient records via Ollama
+      -> Return reply + sources + metadata (source: 'patient_rag+ollama')
+      
+    Case 2: GENERAL Medical Query
+      -> Route: GENERAL
+      -> Send question to Ollama (augmented with guidelines RAG if available)
+      -> If confident/sufficient -> Return answer (source: 'ollama')
+      
+    Case 3: GENERAL Fallback with Wikipedia
+      -> If Ollama indicates insufficient information / inability to answer:
+      -> Query Wikipedia Service
+      -> Pass retrieved Wikipedia context to Ollama
+      -> Generate final synthesized response (source: 'ollama+wikipedia')
     """
-    retrieved_chunks: List[Dict[str, Any]] = []
+    history = history or []
+    ollama_service = get_ollama_service()
+
+    # Step 1: Query Routing & Classification
+    classification = classify_query(message)
+    query_type_str = classification.query_type.value
+
+    # ─────────────────────────────────────────────────────────────
+    # CASE 1: PATIENT-SPECIFIC QUERY
+    # ─────────────────────────────────────────────────────────────
+    if classification.query_type == QueryType.PATIENT_SPECIFIC:
+        patient_id = None
+        patient_obj = None
+
+        if current_user and db is not None:
+            if current_user.role == UserRole.patient:
+                patient_obj = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+                if patient_obj:
+                    patient_id = patient_obj.id
+            elif current_user.role in (UserRole.doctor, UserRole.admin):
+                # Doctor inquiring - check if patient_context or direct patient is available
+                if patient_context and patient_context.get("patient_id"):
+                    patient_id = patient_context["patient_id"]
+                else:
+                    patient_obj = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+                    if patient_obj:
+                        patient_id = patient_obj.id
+
+        if not patient_id or db is None:
+            # Authenticated user is not a patient or has no profile records
+            reply = (
+                "I could not find an active patient profile associated with your account "
+                "to retrieve personal medical records."
+            )
+            return ChatbotResult(
+                reply=reply,
+                sources=[],
+                query_type=query_type_str,
+                source="patient_rag+ollama"
+            )
+
+        # Retrieve confidential patient records strictly for this patient_id
+        patient_rag = get_patient_rag_service()
+        rag_result = patient_rag.retrieve_patient_context(patient_id=patient_id, db=db, query=message)
+
+        prompt = ollama_service.build_patient_prompt(
+            message=message,
+            patient_context=rag_result.context_text,
+            history=history
+        )
+
+        try:
+            raw_reply = await ollama_service.generate(prompt)
+            reply = raw_reply.strip()
+        except Exception as e:
+            logger.error(f"Ollama generation failed during patient-specific query: {e}")
+            raise
+
+        return ChatbotResult(
+            reply=reply,
+            sources=rag_result.sources,
+            query_type=query_type_str,
+            source="patient_rag+ollama"
+        )
+
+    # ─────────────────────────────────────────────────────────────
+    # CASE 2 & 3: GENERAL MEDICAL QUERY + WIKIPEDIA FALLBACK
+    # ─────────────────────────────────────────────────────────────
+    guidelines_chunks: List[Dict[str, Any]] = []
     sources: List[Dict[str, Any]] = []
 
-    # 1. RAG Retrieval
+    # Optional: Retrieve clinical guidelines from vector knowledge base
     if getattr(settings, "RAG_ENABLED", True) and db is not None:
         try:
             embedding_service = get_embedding_service()
             query_embedding = await embedding_service.aembed_text(message)
             vector_store = get_vector_store()
-            retrieved_chunks = vector_store.search_similar(
+            guidelines_chunks = vector_store.search_similar(
                 db=db,
                 query_embedding=query_embedding,
                 top_k=getattr(settings, "RAG_TOP_K", 3),
                 min_score=0.08
             )
 
-            # Extract distinct citations
-            seen_sources = set()
-            for chk in retrieved_chunks:
+            seen = set()
+            for chk in guidelines_chunks:
                 key = (chk.get("document_title"), chk.get("section"))
-                if key not in seen_sources:
-                    seen_sources.add(key)
+                if key not in seen:
+                    seen.add(key)
                     sources.append({
                         "document_title": chk.get("document_title"),
                         "section": chk.get("section"),
@@ -125,28 +143,61 @@ async def chat_with_medibot(
                         "snippet": chk.get("snippet")
                     })
         except Exception as e:
-            logger.warning(f"RAG retrieval skipped due to error: {e}")
+            logger.warning(f"Guidelines vector search skipped due to error: {e}")
 
-    # 2. Build Augmented Prompt
-    prompt = _build_prompt(message, history, patient_context, retrieved_chunks)
+    general_prompt = ollama_service.build_general_prompt(
+        message=message,
+        history=history,
+        guidelines_chunks=guidelines_chunks
+    )
 
-    # 3. Call Ollama LLM
     try:
-        url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
-        payload = {
-            "model": settings.OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-        }
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            reply = data.get("response", "").strip()
-
-        logger.info(f"MediBot responded | model={settings.OLLAMA_MODEL} | sources_used={len(sources)}")
-        return reply, sources
-
+        raw_reply = await ollama_service.generate(general_prompt)
+        reply = raw_reply.strip()
     except Exception as e:
-        logger.error(f"MediBot generation error: {str(e)}")
+        logger.error(f"Ollama generation failed during general query: {e}")
         raise
+
+    # Check whether Ollama response is insufficient / uncertain and requires external Wikipedia fallback
+    is_insufficient = ollama_service.is_insufficient_response(reply)
+
+    if is_insufficient:
+        logger.info(f"Ollama response triggered Wikipedia fallback for query: '{message[:50]}'")
+        wiki_service = get_wikipedia_service()
+        wiki_result = await wiki_service.search_and_summarize(message)
+
+        if wiki_result and wiki_result.extract:
+            wiki_prompt = ollama_service.build_wikipedia_prompt(
+                message=message,
+                wikipedia_title=wiki_result.title,
+                wikipedia_extract=wiki_result.extract,
+                history=history
+            )
+
+            try:
+                wiki_reply = await ollama_service.generate(wiki_prompt)
+                if wiki_reply and wiki_reply.strip():
+                    wiki_sources = [
+                        {
+                            "document_title": f"Wikipedia: {wiki_result.title}",
+                            "section": "Article Summary",
+                            "source_file": wiki_result.url,
+                            "snippet": wiki_result.extract[:200] + ("..." if len(wiki_result.extract) > 200 else "")
+                        }
+                    ]
+                    return ChatbotResult(
+                        reply=wiki_reply.strip(),
+                        sources=wiki_sources,
+                        query_type=query_type_str,
+                        source="ollama+wikipedia"
+                    )
+            except Exception as e:
+                logger.warning(f"Ollama generation with Wikipedia context failed: {e}")
+
+    # Return standard general medical response
+    return ChatbotResult(
+        reply=reply,
+        sources=sources,
+        query_type=query_type_str,
+        source="ollama"
+    )

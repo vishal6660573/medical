@@ -13,7 +13,9 @@ ml/
 ├── notebooks/
 │   ├── 01_diabetes_pipeline.ipynb          # End-to-end Tabular Pipeline for Diabetes Risk (Pima Indians)
 │   ├── 02_heart_disease_pipeline.ipynb     # End-to-end Tabular Pipeline for Coronary Heart Disease (UCI)
-│   └── 03_chest_xray_pipeline.ipynb        # Deep Learning Transfer Learning Pipeline (DenseNet121 CXR)
+│   ├── 03_chest_xray_pipeline.ipynb        # Deep Learning Transfer Learning Pipeline (DenseNet121 CXR)
+│   ├── diabetes_training.ipynb             # 22-Section Interview-Ready Diabetes Model Training & Evaluation
+│   └── heart_training.ipynb                # 22-Section Interview-Ready Heart Disease Model Training & Evaluation
 │
 ├── artifacts/                              # Serialized Production Artifacts & Metadata
 │   ├── diabetes/
@@ -181,13 +183,14 @@ ml/
 
 The ML pipelines are fully synchronized with the FastAPI backend prediction services without requiring any modifications to the application codebase:
 
-### 1. Diabetes Prediction Service (`services/diabetes_prediction_service.py`)
+### 1. Diabetes Prediction Service (`backend/services/diabetes_prediction_service.py`)
 ```python
 import joblib
-import numpy as np
+from pathlib import Path
 
-model = joblib.load("models/diabetes/model.pkl")
-scaler = joblib.load("models/diabetes/scaler.pkl")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+model = joblib.load(PROJECT_ROOT / "ml" / "artifacts" / "diabetes" / "model.pkl")
+scaler = joblib.load(PROJECT_ROOT / "ml" / "artifacts" / "diabetes" / "scaler.pkl")
 
 # Arrange features: [pregnancies, glucose, blood_pressure, skin_thickness, insulin, bmi, dpf, age]
 features = np.array([[data.pregnancies, data.glucose, data.blood_pressure, data.skin_thickness, 
@@ -196,12 +199,13 @@ scaled = scaler.transform(features)
 probability = model.predict_proba(scaled)[0][1]
 ```
 
-### 2. Heart Disease Prediction Service (`services/heart_prediction_service.py`)
+### 2. Heart Disease Prediction Service (`backend/services/heart_prediction_service.py`)
 ```python
 import joblib
-import numpy as np
+from pathlib import Path
 
-model = joblib.load("models/heart/model.pkl")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+model = joblib.load(PROJECT_ROOT / "ml" / "artifacts" / "heart_disease" / "model.pkl")
 
 # Arrange features: [age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal]
 features = np.array([[data.age, data.sex, data.cp, data.trestbps, data.chol, data.fbs, 
@@ -209,13 +213,15 @@ features = np.array([[data.age, data.sex, data.cp, data.trestbps, data.chol, dat
 probability = model.predict_proba(features)[0][1]
 ```
 
-### 3. Chest X-Ray Prediction Service (`models/xray/prediction_service.py`)
+### 3. Chest X-Ray Prediction Service (`backend/services/xray_prediction_service.py`)
 ```python
 import tensorflow as tf
+from pathlib import Path
 import numpy as np
 from PIL import Image
 
-model = tf.keras.models.load_model("models/xray/model.h5")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+model = tf.keras.models.load_model(str(PROJECT_ROOT / "ml" / "artifacts" / "chest_xray" / "model.h5"))
 
 def preprocess_image(image: Image.Image) -> np.ndarray:
     image = image.resize((224, 224)).convert("RGB")

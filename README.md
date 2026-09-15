@@ -79,9 +79,8 @@ smarthealth-main/
 │   │   ├── auth/                # JWT handler, password hashing (bcrypt), dependencies
 │   │   ├── core/                # Configuration, logging, exception handlers
 │   │   └── database/            # SQLAlchemy database engine and models
-│   ├── models/                  # Trained ML models and weights (diabetes, heart, xray)
 │   ├── schemas/                 # Pydantic request/response schemas
-│   ├── services/                # Prediction services and storage handlers
+│   ├── services/                # Prediction services (diabetes, heart, xray) & storage handlers
 │   ├── requirements.txt         # Backend Python dependencies
 │   ├── .env.example             # Backend environment template
 │   └── venv/                    # Python virtual environment
@@ -97,6 +96,13 @@ smarthealth-main/
 │   ├── package.json             # Frontend dependencies and scripts
 │   └── vite.config.js           # Vite configuration & dev proxy
 │
+├── ml/                          # Machine Learning experimentation & training
+│   ├── notebooks/               # Jupyter training & pipeline notebooks (.ipynb)
+│   ├── artifacts/               # Metadata, training plots & model checkpoints
+│   ├── data/                    # Raw & processed training data
+│   └── README.md                # ML architecture & pipeline documentation
+│
+├── data/                        # Project datasets (diabetes.csv, heart.csv)
 ├── docker-compose.yml           # PostgreSQL Docker service
 ├── .env.example                 # Environment variables template
 ├── .gitignore                   # Git ignore specifications

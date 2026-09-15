@@ -4,10 +4,10 @@ import joblib
 import pandas as pd
 from app.core.logs import logger
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-MODEL_PATH = BASE_DIR / "models" / "diabetes" / "model.pkl"
-SCALER_PATH = BASE_DIR / "models" / "diabetes" / "scaler.pkl"
+MODEL_PATH = PROJECT_ROOT / "ml" / "artifacts" / "diabetes" / "model.pkl"
+SCALER_PATH = PROJECT_ROOT / "ml" / "artifacts" / "diabetes" / "scaler.pkl"
 
 # Load trained artifacts
 model = joblib.load(MODEL_PATH)

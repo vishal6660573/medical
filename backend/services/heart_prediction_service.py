@@ -4,9 +4,9 @@ import joblib
 import pandas as pd
 from app.core.logs import logger
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-MODEL_PATH = BASE_DIR / "models" / "heart" / "model.pkl"
+MODEL_PATH = PROJECT_ROOT / "ml" / "artifacts" / "heart_disease" / "model.pkl"
 
 # Load trained model
 model = joblib.load(MODEL_PATH)
